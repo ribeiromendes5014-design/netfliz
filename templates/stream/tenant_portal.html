@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Início • Netfliz{% endblock %}
+
+{% block content %}
+<section class="catalog">
+  <header class="catalog-header">
+    <div>
+      <h1>Assista filmes, séries e novelas em um só lugar</h1>
+      <p>Escolha o conteúdo perfeito para a sua sessão e acesse com um clique.</p>
+    </div>
+  </header>
+
+  {% if continue_videos %}
+  <div class="continue-section">
+    <div class="continue-section__header">
+      <div>
+        <p class="continue-section__eyebrow">Continue assistindo</p>
+        <h2>Retome de onde parou</h2>
+      </div>
+    </div>
+    <div class="continue-grid">
+      {% for video in continue_videos %}
+      <article class="continue-card">
+        <form
+          method="post"
+          action="{% url 'stream:portal-reset' video.slug %}"
+          class="continue-card__actions"
+        >
+          {% csrf_token %}
+          <button type="submit" class="continue-card__reset" aria-label="Remover do Retomar">
+            ×
+          </button>
+        </form>
+        <a
+          class="continue-card__link"
+          href="{% url 'stream:tenant-watch' tenant.slug video.slug %}"
+        >
+          <div class="continue-card__image">
+            <img
+              src="{{ video.cover_url|default:'/static/img/default-cover.png' }}"
+              alt="Capa {{ video.title }}"
+              loading="lazy"
+            />
+            <span class="continue-card__badge">Continuar</span>
+          </div>
+          <div class="continue-card__meta">
+            <h3>{{ video.title }}</h3>
+            <p>Retomar em {{ video.resume_label }}</p>
+          </div>
+        </a>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if videos %}
+  <div class="catalog-grid">
+    {% for video in videos %}
+      <button
+        type="button"
+        class="catalog-card"
+        data-title="{{ video.title }}"
+        data-description="{{ video.description|default:'Sem descrição disponível.' }}"
+        data-format="{{ video.get_video_type_display }}"
+        data-cover="{{ video.cover_url|default:'' }}"
+        data-watch-url="{% url 'stream:tenant-watch' tenant.slug video.slug %}"
+      data-progress="{{ video.resume_position|default:0 }}"
+      >
+      <span class="catalog-card__badge">{{ video.get_video_type_display }}</span>
+      <div class="catalog-card__image">
+        <img src="{{ video.cover_url|default:'/static/img/default-cover.png' }}" loading="lazy" alt="Capa {{ video.title }}" />
+      </div>
+      <div class="catalog-card__meta">
+        <h3>{{ video.title }}</h3>
+        <p>{{ video.description|truncatechars:80 }}</p>
+      </div>
+    </button>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="catalog-empty">
+    <p>Seu catálogo ainda está vazio. Peça ao proprietário para cadastrar vídeos.</p>
+  </div>
+  {% endif %}
+</section>
+
+<div class="catalog-modal" id="video-modal">
+  <div class="catalog-modal__dialog">
+    <button type="button" class="catalog-modal__close" aria-label="Fechar">✕</button>
+    <div class="catalog-modal__hero">
+      <img src="" alt="" id="catalog-modal-cover" loading="lazy" />
+    </div>
+    <div class="catalog-modal__body">
+      <div class="catalog-modal__heading">
+        <h2 id="catalog-modal-title"></h2>
+        <span id="catalog-modal-format"></span>
+      </div>
+      <p id="catalog-modal-description"></p>
+      <div class="catalog-modal__controls">
+        <a id="catalog-modal-watch" class="btn btn-accent" href="#">
+          Assistir agora
+        </a>
+        <button type="button" class="btn btn-secondary modal-close">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const modal = document.getElementById("video-modal");
+      if (!modal) {
+        return;
+      }
+      const closeModalButtons = modal.querySelectorAll(".catalog-modal__close, .modal-close");
+    const cards = document.querySelectorAll(".catalog-card");
+    const cover = document.getElementById("catalog-modal-cover");
+    const titleEl = document.getElementById("catalog-modal-title");
+    const descriptionEl = document.getElementById("catalog-modal-description");
+    const formatEl = document.getElementById("catalog-modal-format");
+    const watchLink = document.getElementById("catalog-modal-watch");
+    const fallbackCover =
+      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 225'%3E%3Crect width='400' height='225' fill='%230a0a0f'/%3E%3Ctext x='50%25' y='50%25' fill='%23f5f5f1' font-size='26' font-family='Segoe UI' text-anchor='middle' dominant-baseline='middle'%3ENetfliz%3C/text%3E%3C/svg%3E";
+
+    const formatTime = (seconds) => {
+      const secs = Math.floor(seconds || 0);
+      const minutes = Math.floor(secs / 60);
+      const rem = (secs % 60).toString().padStart(2, "0");
+      return `${minutes}:${rem}`;
+    };
+
+    const updateWatchButtonLabel = (progress) => {
+      const value = Number(progress) || 0;
+      if (value > 5) {
+        watchLink.textContent = `Continuar (${formatTime(value)})`;
+      } else {
+        watchLink.textContent = "Assistir agora";
+      }
+    };
+
+    function openModal(data) {
+      cover.src = data.cover || fallbackCover;
+      cover.alt = data.title;
+      titleEl.textContent = data.title;
+      descriptionEl.textContent = data.description;
+      formatEl.textContent = data.format;
+      watchLink.href = data.watchUrl;
+      updateWatchButtonLabel(data.progress);
+      modal.classList.add("open");
+    }
+
+    cards.forEach((card) => {
+      card.addEventListener("click", () => {
+        openModal({
+          title: card.dataset.title,
+          description: card.dataset.description,
+          format: card.dataset.format,
+          cover: card.dataset.cover,
+          watchUrl: card.dataset.watchUrl,
+          progress: card.dataset.progress,
+        });
+      });
+    });
+
+      const closeModal = () => modal.classList.remove("open");
+
+      closeModalButtons.forEach((btn) => btn.addEventListener("click", closeModal));
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+  });
+  </script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const cards = Array.from(document.querySelectorAll(".catalog-card"));
+      if (!cards.length) {
+        return;
+      }
+      let lastIndex = 0;
+      const focusCard = (index) => {
+        lastIndex = (index + cards.length) % cards.length;
+        cards[lastIndex].focus();
+      };
+
+      document.body.addEventListener("keydown", (event) => {
+        const key = event.key;
+        if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) {
+          return;
+        }
+        event.preventDefault();
+        const activeIndex = cards.indexOf(document.activeElement);
+        let nextIndex = activeIndex >= 0 ? activeIndex : lastIndex;
+        if (key === "ArrowRight" || key === "ArrowDown") {
+          nextIndex += 1;
+        } else if (key === "ArrowLeft" || key === "ArrowUp") {
+          nextIndex -= 1;
+        }
+        focusCard(nextIndex);
+      });
+
+      focusCard(0);
+    });
+  </script>
+{% endblock %}

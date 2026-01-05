@@ -1,0 +1,245 @@
+﻿{% extends "base.html" %}
+
+{% block title %}{{ video.title }} | Netfliz{% endblock %}
+
+{% block content %}
+<section class="panel video-player" data-tenant="{{ tenant.slug }}" data-video="{{ video.slug }}">
+  <header>
+    <h1>{{ video.title }}</h1>
+    <p>{{ video.description }}</p>
+    <a class="btn btn-secondary" href="{% url 'stream:tenant-portal' %}">
+      Voltar ao catálogo</a>
+  </header>
+  <div class="player">
+    {% if video.uses_iframe_player %}
+    <div class="iframe-wrapper">
+      <iframe
+        src="{{ video.source_url }}"
+        title="{{ video.title }}"
+        allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
+        allowfullscreen
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+      ></iframe>
+    </div>
+    {% else %}
+    <video
+      controls
+      poster="{{ video.cover_url }}"
+      class="responsive {% if video.rotate_180 %}rotate-180{% endif %}"
+      data-progress="{{ progress_position|default:0 }}"
+      data-rotate="{{ video.rotate_180|yesno:'1,0' }}"
+    >
+      <source src="{{ video_stream_url }}" type="{{ video.stream_mime }}" />
+      Seu navegador não suporta este formato.
+    </video>
+    {% endif %}
+  </div>
+</section>
+
+{% if not video.uses_iframe_player %}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const videoElement = document.querySelector(".player video");
+    const progressUrl = "{{ progress_url }}";
+    const progressAttr = videoElement?.dataset.progress || "0";
+    const playerSection = document.querySelector(".panel.video-player");
+    const tenantSlug = playerSection?.dataset?.tenant;
+    const videoSlug = playerSection?.dataset?.video;
+    const STORAGE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+    const storageKey =
+      tenantSlug && videoSlug ? `video-progress:${tenantSlug}:${videoSlug}` : null;
+
+    const readLocalProgress = () => {
+      if (!storageKey || !window.localStorage) {
+        return null;
+      }
+      try {
+        const value = localStorage.getItem(storageKey);
+        if (!value) {
+          return null;
+        }
+        const parsed = JSON.parse(value);
+        if (
+          typeof parsed !== "object" ||
+          typeof parsed.position !== "number" ||
+          Number.isNaN(parsed.position)
+        ) {
+          return null;
+        }
+        if (
+          parsed.timestamp &&
+          Date.now() - parsed.timestamp > STORAGE_TTL_MS
+        ) {
+          localStorage.removeItem(storageKey);
+          return null;
+        }
+        return parsed;
+      } catch {
+        return null;
+      }
+    };
+
+    const saveLocalProgress = (position) => {
+      if (!storageKey || !window.localStorage) {
+        return;
+      }
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({ position, timestamp: Date.now() })
+        );
+      } catch {
+        // ignore
+      }
+    };
+
+    const serverInitial = parseFloat(progressAttr.toString().replace(",", ".")) || 0;
+    const localProgress = readLocalProgress();
+    const initialPosition = Math.max(serverInitial, localProgress?.position || 0);
+
+    if (!progressUrl || !videoElement) {
+      return;
+    }
+
+    const loadHlsSource = () => {
+      const sourceUrl = "{{ video_stream_url }}";
+      const canPlayNative = videoElement.canPlayType("application/vnd.apple.mpegurl");
+      if (canPlayNative) {
+        videoElement.src = sourceUrl;
+        return;
+      }
+      if (window.Hls && Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(sourceUrl);
+        hls.attachMedia(videoElement);
+      } else {
+        videoElement.src = sourceUrl;
+      }
+    };
+
+    loadHlsSource();
+
+    const getCookie = (name) => {
+      const matches = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+      return matches ? decodeURIComponent(matches[1]) : "";
+    };
+
+    const sendProgress = (position) => {
+      fetch(progressUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify({ position }),
+      }).catch(() => {});
+    };
+
+    const sendProgressBeacon = () => {
+      if (!progressUrl) {
+        return;
+      }
+      const token = getCookie("csrftoken");
+      const formData = new FormData();
+      formData.append("position", videoElement.currentTime);
+      formData.append("csrfmiddlewaretoken", token);
+      saveLocalProgress(videoElement.currentTime);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(progressUrl, formData);
+        return;
+      }
+      sendProgress(videoElement.currentTime);
+    };
+
+    const applyInitialPosition = () => {
+      if (initialPosition <= 0) {
+        return;
+      }
+      if (!isNaN(videoElement.duration) && videoElement.duration > 0) {
+        videoElement.currentTime = Math.min(
+          initialPosition,
+          Math.max(0, videoElement.duration - 0.3)
+        );
+      } else {
+        videoElement.currentTime = initialPosition;
+      }
+    };
+
+    const enforceInitialPosition = () => {
+      setTimeout(applyInitialPosition, 150);
+    };
+
+    videoElement.addEventListener("loadedmetadata", () => {
+      applyInitialPosition();
+      enforceInitialPosition();
+    });
+    videoElement.addEventListener("durationchange", applyInitialPosition);
+    if (videoElement.readyState > 0) {
+      applyInitialPosition();
+    }
+    videoElement.addEventListener("play", enforceInitialPosition);
+
+    let updateTimer;
+    const clearPendingUpdate = () => {
+      if (updateTimer) {
+        clearTimeout(updateTimer);
+        updateTimer = null;
+      }
+    };
+    const throttleUpdate = () => {
+      if (updateTimer) {
+        return;
+      }
+      updateTimer = setTimeout(() => {
+        const current = videoElement.currentTime;
+        saveLocalProgress(current);
+        sendProgress(current);
+        updateTimer = null;
+      }, 4000);
+    };
+
+    videoElement.addEventListener("timeupdate", throttleUpdate);
+    const persistPosition = () => {
+      const position = videoElement.currentTime;
+      saveLocalProgress(position);
+      return sendProgress(position);
+    };
+    videoElement.addEventListener("pause", persistPosition);
+    videoElement.addEventListener("ended", persistPosition);
+    const handlePageHidden = () => {
+      clearPendingUpdate();
+      sendProgressBeacon();
+    };
+    window.addEventListener("beforeunload", handlePageHidden);
+    window.addEventListener("pagehide", handlePageHidden);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        handlePageHidden();
+      }
+    });
+
+    const handleFullscreenRotation = () => {
+      const fullscreenElement =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      const isFullscreen = fullscreenElement === videoElement;
+      if (isFullscreen) {
+        videoElement.classList.add("force-fullscreen-rotate");
+      } else {
+        videoElement.classList.remove("force-fullscreen-rotate");
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenRotation);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenRotation);
+    document.addEventListener("mozfullscreenchange", handleFullscreenRotation);
+    document.addEventListener("MSFullscreenChange", handleFullscreenRotation);
+    handleFullscreenRotation();
+  });
+</script>
+{% endif %}
+{% endblock %}
