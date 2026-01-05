@@ -1,9 +1,9 @@
 {
   "name": "Netfliz",
   "short_name": "Netfliz",
-  "description": "Versão móvel do Netfliz com suporte offline leve e sessão prolongada em http://192.168.3.3:8000/portal/",
-  "start_url": "http://192.168.3.3:8000/portal/",
-  "scope": "http://192.168.3.3:8000/",
+  "description": "Versão móvel do Netfliz com suporte offline leve e sessão prolongada em https://netfliz.onrender.com/portal/",
+  "start_url": "https://netfliz.onrender.com/portal/",
+  "scope": "https://netfliz.onrender.com/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#000000",
