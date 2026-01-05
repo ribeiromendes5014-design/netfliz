@@ -143,3 +143,6 @@ LOGOUT_REDIRECT_URL = 'login'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# No final do arquivo settings.py
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
