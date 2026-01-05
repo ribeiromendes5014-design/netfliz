@@ -25,7 +25,12 @@ SECRET_KEY = 'django-insecure-z_e$pcz+1+q0%bezo6btd2z-5mn!dcb0+w(t$)0k77(&-_38bw
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.3.3", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    "192.168.3.3", 
+    "localhost", 
+    "127.0.0.1", 
+    "netfliz.onrender.com"
+]
 AUTHENTICATION_BACKENDS = ["stream.backends.EmailBackend", "django.contrib.auth.backends.ModelBackend"]
 
 
