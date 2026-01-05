@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block body_class %}login-page{% endblock %}
+
+{% block title %}Entrar | Netfliz{% endblock %}
+
+{% block content %}
+<section class="login-shell">
+  <article class="login-card">
+    <div class="login-card__inner">
+      <header class="login-card__header">
+        <h1>Entrar</h1>
+      </header>
+      {% if form.non_field_errors %}
+      <div class="login-error">
+        {{ form.non_field_errors }}
+      </div>
+      {% endif %}
+      <form method="post" class="login-form">
+        {% csrf_token %}
+        <div class="form-field">
+          {{ form.username.errors }}
+          {{ form.username.as_widget }}
+        </div>
+        <div class="form-field">
+          {{ form.password.errors }}
+          {{ form.password.as_widget }}
+        </div>
+        <label class="remember-control">
+          <input type="checkbox" name="remember" value="on" />
+          Manter conectado
+        </label>
+        <button class="login-button" type="submit">Entrar</button>
+      </form>
+    </div>
+  </article>
+</section>
+{% endblock %}
