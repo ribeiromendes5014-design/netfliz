@@ -89,6 +89,9 @@ DATABASES = {
         'PASSWORD': 'RR5Dfal904Mq3SYNiqtWqRkK687oPnGY',
         'HOST': 'dpg-d5dkq3euk2gs7391t7fg-a.virginia-postgres.render.com',
         'PORT': '5432',
+        'OPTIONS': {
+            'sslmode': 'require',
+        }
     }
 }
 
