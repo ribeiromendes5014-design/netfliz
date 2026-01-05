@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Painel do Proprietário | Netfliz{% endblock %}
+
+{% block content %}
+<section class="panel owner-panel">
+  <header>
+    <h1>Painel do Proprietário</h1>
+    <p>Cadastre os vídeos que todos os tenants poderão assistir e controle quem deve ficar de fora.</p>
+  </header>
+  <div class="two-columns">
+    <div class="video-list-column">
+      <h2>Vídeos cadastrados</h2>
+      {% if videos %}
+      <ul class="video-list">
+        {% for video in videos %}
+        <li>
+          <div>
+            <strong>{{ video.title }}</strong>
+            <small>{{ video.slug }}</small>
+          </div>
+          <div class="video-list__actions">
+            <a class="btn btn-secondary" href="{% url 'stream:owner-video-edit' video.pk %}">Editar</a>
+            <a class="btn btn-accent" href="{% url 'stream:owner-video-delete' video.pk %}">Excluir</a>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="catalog-empty">Nenhum vídeo cadastrado ainda.</p>
+      {% endif %}
+      <section class="series-list-section">
+        <h2>Séries cadastradas</h2>
+        {% if series_list %}
+        <ul class="series-list">
+          {% for series in series_list %}
+          <li>
+            <div>
+              <strong>{{ series.title }}</strong>
+              <small>{{ series.slug }}</small>
+            </div>
+            <span class="series-status {% if series.is_active %}series-status--active{% else %}series-status--inactive{% endif %}">
+              {{ series.is_active|yesno:"Ativa,Oculta" }}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="catalog-empty">Nenhuma série cadastrada.</p>
+        {% endif %}
+      </section>
+    </div>
+    <div class="video-form-column">
+      <section class="series-form">
+        <h2>Cadastrar nova série</h2>
+        <form method="post" id="series-form">
+          {% csrf_token %}
+          {{ series_form.non_field_errors }}
+          {% for field in series_form %}
+          <div class="form-row">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}
+            <small class="form-hint">{{ field.help_text }}</small>
+            {% endif %}
+            {{ field.errors }}
+          </div>
+          {% endfor %}
+          <button class="btn btn-secondary" type="submit" name="series-submit">Salvar série</button>
+        </form>
+      </section>
+      <section class="video-form">
+        <h2>Cadastrar novo vídeo</h2>
+        <form method="post" id="video-form">
+          {% csrf_token %}
+          {{ video_form.non_field_errors }}
+          {% for field in video_form %}
+          {% if field.name != "blocked_tenants" %}
+          <div class="form-row">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}
+            <small class="form-hint">{{ field.help_text }}</small>
+            {% endif %}
+            {{ field.errors }}
+          </div>
+          {% endif %}
+          {% endfor %}
+          <div class="form-row">
+            <div class="selection-summary" data-target="blocked-modal">
+              <span class="multi-selected">Nenhum tenant ocultado</span>
+              <button type="button">Selecionar contas</button>
+            </div>
+            <small class="form-hint">
+              {{ video_form.blocked_tenants.help_text }}
+            </small>
+            {{ video_form.blocked_tenants.errors }}
+          </div>
+          <button class="btn btn-primary" type="submit">Salvar vídeo</button>
+        </form>
+      </section>
+    </div>
+  </div>
+</section>
+
+<div class="selection-modal" id="blocked-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Ocultar vídeo para</h3>
+      <button type="button" class="modal-close">✕</button>
+    </div>
+    <p class="modal-subtitle">Escolha os tenants que não devem ver este vídeo.</p>
+    <div class="modal-options">
+      {{ video_form.blocked_tenants.as_widget }}
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary modal-close">Concluir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const modal = document.getElementById("blocked-modal");
+    if (!modal) {
+      return;
+    }
+    const toggle = document.querySelector("[data-target='blocked-modal']");
+    if (!toggle) {
+      return;
+    }
+    const closeButtons = modal.querySelectorAll(".modal-close");
+    const checkboxes = modal.querySelectorAll("input[type=checkbox]");
+    const summary = document.querySelector(".selection-summary .multi-selected");
+
+    const updateSummary = () => {
+      const selected = Array.from(checkboxes).filter((input) => input.checked);
+      if (!summary) {
+        return;
+      }
+      if (!selected.length) {
+        summary.textContent = "Nenhum tenant ocultado";
+        return;
+      }
+      summary.textContent = selected
+        .map((input) => {
+          const label = modal.querySelector(`label[for="${input.id}"]`);
+          return label ? label.textContent.trim() : input.value;
+        })
+        .join(", ");
+    };
+
+    const openModal = () => modal.classList.add("open");
+    const closeModal = () => modal.classList.remove("open");
+
+    toggle.addEventListener("click", openModal);
+    closeButtons.forEach((button) => button.addEventListener("click", closeModal));
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        closeModal();
+      }
+    });
+    checkboxes.forEach((input) => input.addEventListener("change", updateSummary));
+    updateSummary();
+  });
+</script>
+{% endblock %}
