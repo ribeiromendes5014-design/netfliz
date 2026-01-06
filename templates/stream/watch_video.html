@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+
+{% block title %}{{ video.title }} | Netfliz{% endblock %}
+
+{% block content %}
+<style>
+.player {
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+.video-player__controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1rem;
+  z-index: 2147483647;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  pointer-events: none;
+}
+.player:hover .video-player__controls,
+.player .video-player__controls.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.video-player__controls--hidden {
+    display: none !important;
+}
+</style>
+<section class="panel video-player" data-tenant="{{ tenant.slug }}" data-video="{{ video.slug }}">
+  <header>
+    <h1>{{ video.title }}</h1>
+    <p>{{ video.description }}</p>
+    <a class="btn btn-secondary" href="{% url 'stream:tenant-portal' %}">
+      Voltar ao catálogo</a>
+  </header>
+  <div class="player">
+    {% if video.uses_iframe_player %}
+    <div class="iframe-wrapper">
+      <div class="responsive-iframe responsive-iframe--vertical">
+        <iframe
+          src="{% if autoplay and iframe_autoplay_url %}{{ iframe_autoplay_url }}{% else %}{{ video.source_url }}{% endif %}"
+          title="{{ video.title }}"
+          allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
+          allowfullscreen
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+      </div>
+    </div>
+    {% else %}
+    <video
+      controls
+      poster="{{ video.cover_url }}"
+      class="responsive {% if video.rotate_180 %}rotate-180{% endif %}"
+      data-progress="{{ progress_position|default:0 }}"
+      data-rotate="{{ video.rotate_180|yesno:'1,0' }}"
+    >
+      <source src="{{ video_stream_url }}" type="{{ video.stream_mime }}" />
+      Seu navegador não suporta este formato.
+    </video>
+    {% endif %}
+
+    <div class="video-player__controls video-player__controls--hidden" aria-label="Controles do player">
+      <button type="button" id="video-play-helper" class="video-player__control btn">
+        ▶ Reproduzir
+      </button>
+      <button type="button" id="video-fullscreen-helper" class="video-player__control btn btn-secondary">
+        Tela cheia
+      </button>
+      <button type="button" id="video-back-helper" class="video-player__control btn btn-secondary">
+        × Voltar
+      </button>
+    </div>
+  </div>
+</section>
+
+{% if not video.uses_iframe_player %}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const controlsContainer = document.querySelector('.video-player__controls');
+
+    const isTV = () => {
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+        const isTVUA = /tv|googletv|smarttv|dtv|crkey|tizen|webos|netcast|viera|boxee|kylo|roku|dlnadoc|pov_tv|hbbtv/i.test(userAgent);
+
+        if (isTVUA) return true;
+
+        const isLargeScreen = window.screen.width >= 1920 && window.screen.height >= 1080;
+        if (isLargeScreen && !isMobile) return true;
+        
+        if (/android/i.test(userAgent) && isLargeScreen) return true;
+
+        return false;
+    };
+
+    if (isTV()) {
+        if(controlsContainer) controlsContainer.classList.remove('video-player__controls--hidden');
+    }
+
+    const videoElement = document.querySelector(".player video");
+    const shouldAutoplay = {{ autoplay|yesno:"true,false" }};
+    const progressUrl = "{{ progress_url }}";
+    const progressAttr = videoElement?.dataset.progress || "0";
+    const playerSection = document.querySelector(".panel.video-player");
+    const tenantSlug = playerSection?.dataset?.tenant;
+    const videoSlug = playerSection?.dataset?.video;
+    const STORAGE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+    const storageKey =
+      tenantSlug && videoSlug ? `video-progress:${tenantSlug}:${videoSlug}` : null;
+
+    const readLocalProgress = () => {
+      if (!storageKey || !window.localStorage) {
+        return null;
+      }
+      try {
+        const value = localStorage.getItem(storageKey);
+        if (!value) {
+          return null;
+        }
+        const parsed = JSON.parse(value);
+        if (
+          typeof parsed !== "object" ||
+          typeof parsed.position !== "number" ||
+          Number.isNaN(parsed.position)
+        ) {
+          return null;
+        }
+        if (
+          parsed.timestamp &&
+          Date.now() - parsed.timestamp > STORAGE_TTL_MS
+        ) {
+          localStorage.removeItem(storageKey);
+          return null;
+        }
+        return parsed;
+      } catch {
+        return null;
+      }
+    };
+
+    const saveLocalProgress = (position) => {
+      if (!storageKey || !window.localStorage) {
+        return;
+      }
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({ position, timestamp: Date.now() })
+        );
+      } catch {
+        // ignore
+      }
+    };
+
+    const serverInitial = parseFloat(progressAttr.toString().replace(",", ".")) || 0;
+    const localProgress = readLocalProgress();
+    const initialPosition = Math.max(serverInitial, localProgress?.position || 0);
+
+    if (!progressUrl || !videoElement) {
+      return;
+    }
+
+    const loadHlsSource = () => {
+      const sourceUrl = "{{ video_stream_url }}";
+      const canPlayNative = videoElement.canPlayType("application/vnd.apple.mpegurl");
+      if (canPlayNative) {
+        videoElement.src = sourceUrl;
+        return;
+      }
+      if (window.Hls && Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(sourceUrl);
+        hls.attachMedia(videoElement);
+      } else {
+        videoElement.src = sourceUrl;
+      }
+    };
+
+    loadHlsSource();
+
+    const getCookie = (name) => {
+      const matches = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+      return matches ? decodeURIComponent(matches[1]) : "";
+    };
+
+    const sendProgress = (position) => {
+      fetch(progressUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify({ position }),
+      }).catch(() => {});
+    };
+
+    const sendProgressBeacon = () => {
+      if (!progressUrl) {
+        return;
+      }
+      const token = getCookie("csrftoken");
+      const formData = new FormData();
+      formData.append("position", videoElement.currentTime);
+      formData.append("csrfmiddlewaretoken", token);
+      saveLocalProgress(videoElement.currentTime);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(progressUrl, formData);
+        return;
+      }
+      sendProgress(videoElement.currentTime);
+    };
+
+    const applyInitialPosition = () => {
+      if (initialPosition <= 0) {
+        return;
+      }
+      if (!isNaN(videoElement.duration) && videoElement.duration > 0) {
+        videoElement.currentTime = Math.min(
+          initialPosition,
+          Math.max(0, videoElement.duration - 0.3)
+        );
+      } else {
+        videoElement.currentTime = initialPosition;
+      }
+    };
+
+    const enforceInitialPosition = () => {
+      setTimeout(applyInitialPosition, 150);
+    };
+
+    videoElement.addEventListener("loadedmetadata", () => {
+      applyInitialPosition();
+      enforceInitialPosition();
+    });
+    videoElement.addEventListener("durationchange", applyInitialPosition);
+    if (videoElement.readyState > 0) {
+      applyInitialPosition();
+    }
+    videoElement.addEventListener("play", enforceInitialPosition);
+
+    let updateTimer;
+    const clearPendingUpdate = () => {
+      if (updateTimer) {
+        clearTimeout(updateTimer);
+        updateTimer = null;
+      }
+    };
+    const throttleUpdate = () => {
+      if (updateTimer) {
+        return;
+      }
+      updateTimer = setTimeout(() => {
+        const current = videoElement.currentTime;
+        saveLocalProgress(current);
+        sendProgress(current);
+        updateTimer = null;
+      }, 4000);
+    };
+
+    videoElement.addEventListener("timeupdate", throttleUpdate);
+    const persistPosition = () => {
+      const position = videoElement.currentTime;
+      saveLocalProgress(position);
+      return sendProgress(position);
+    };
+    videoElement.addEventListener("pause", persistPosition);
+    videoElement.addEventListener("ended", persistPosition);
+    const handlePageHidden = () => {
+      clearPendingUpdate();
+      sendProgressBeacon();
+    };
+    window.addEventListener("beforeunload", handlePageHidden);
+    window.addEventListener("pagehide", handlePageHidden);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        handlePageHidden();
+      }
+    });
+
+    const handleFullscreenRotation = () => {
+      const fullscreenElement =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      const isFullscreen = fullscreenElement === videoElement;
+      if (isFullscreen) {
+        videoElement.classList.add("force-fullscreen-rotate");
+      } else {
+        videoElement.classList.remove("force-fullscreen-rotate");
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenRotation);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenRotation);
+    document.addEventListener("mozfullscreenchange", handleFullscreenRotation);
+    document.addEventListener("MSFullscreenChange", handleFullscreenRotation);
+    handleFullscreenRotation();
+
+    const requestPlayerFullscreen = () => {
+      if (!videoElement) {
+        return;
+      }
+      const enterFullscreen =
+        videoElement.requestFullscreen ||
+        videoElement.webkitRequestFullscreen ||
+        videoElement.mozRequestFullScreen ||
+        videoElement.msRequestFullscreen;
+      if (enterFullscreen) {
+        enterFullscreen.call(videoElement).catch(() => {});
+      }
+    };
+
+    const handleRemoteKey = (event) => {
+      const key = event.key;
+      if (key === "Enter") {
+        if (videoElement.paused) {
+          videoElement.play();
+        } else {
+          videoElement.pause();
+        }
+        event.preventDefault();
+      } else if (key === "ArrowLeft") {
+        videoElement.currentTime = Math.max(0, videoElement.currentTime - 10);
+        event.preventDefault();
+      } else if (key === "ArrowRight") {
+        videoElement.currentTime = Math.min(videoElement.duration || videoElement.duration + 10, videoElement.currentTime + 10);
+        event.preventDefault();
+      } else if (key === "Backspace" || key === "Escape") {
+        window.location.href = "{% url 'stream:tenant-portal' %}";
+        event.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handleRemoteKey);
+    const attemptAutoplay = () => {
+      if (!shouldAutoplay || !videoElement) {
+        return;
+      }
+      videoElement.muted = true;
+      videoElement
+        .play()
+        .then(() => {
+          videoElement.muted = false;
+        })
+        .catch(() => {});
+    };
+
+    videoElement?.addEventListener("canplay", attemptAutoplay);
+    if (shouldAutoplay && videoElement) {
+      attemptAutoplay();
+    }
+
+    const playButton = document.getElementById('video-play-helper');
+    const fullscreenButton = document.getElementById('video-fullscreen-helper');
+    const backButton = document.getElementById('video-back-helper');
+    const PLAY_LABEL = "▶ Reproduzir";
+    const PAUSE_LABEL = "▌▌ Pausar";
+
+    if (backButton) {
+        backButton.addEventListener('click', () => {
+            window.location.href = "{% url 'stream:tenant-portal' %}";
+        });
+    }
+
+    if (videoElement) {
+        const setPlayButtonState = (paused) => {
+            if(playButton) playButton.textContent = paused ? PLAY_LABEL : PAUSE_LABEL;
+        };
+        
+        if (playButton) {
+            setPlayButtonState(videoElement.paused);
+            playButton.addEventListener('click', () => {
+                if (videoElement.paused) {
+                    videoElement.play();
+                } else {
+                    videoElement.pause();
+                }
+            });
+        }
+
+        videoElement.addEventListener('play', () => setPlayButtonState(false));
+        videoElement.addEventListener('pause', () => setPlayButtonState(true));
+        
+        if (fullscreenButton) {
+            fullscreenButton.addEventListener('click', requestPlayerFullscreen);
+        }
+
+        let controlsTimer;
+        const showControls = () => {
+            controlsContainer.classList.add('is-active');
+            clearTimeout(controlsTimer);
+            controlsTimer = setTimeout(() => {
+                if (!videoElement.paused) {
+                    controlsContainer.classList.remove('is-active');
+                }
+            }, 3000);
+        };
+        playerSection.addEventListener('mousemove', showControls);
+        controlsContainer.addEventListener('mousemove', showControls);
+        videoElement.addEventListener('click', () => {
+          if(controlsContainer.classList.contains('is-active')) {
+            controlsContainer.classList.remove('is-active');
+            clearTimeout(controlsTimer);
+          } else {
+            showControls();
+          }
+        });
+        showControls();
+    }
+  });
+</script>
+{% else %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const controlsContainer = document.querySelector('.video-player__controls');
+
+    const isTV = () => {
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+        const isTVUA = /tv|googletv|smarttv|dtv|crkey|tizen|webos|netcast|viera|boxee|kylo|roku|dlnadoc|pov_tv|hbbtv/i.test(userAgent);
+
+        if (isTVUA) return true;
+
+        const isLargeScreen = window.screen.width >= 1920 && window.screen.height >= 1080;
+        if (isLargeScreen && !isMobile) return true;
+        
+        if (/android/i.test(userAgent) && isLargeScreen) return true;
+
+        return false;
+    };
+
+    if (isTV()) {
+        if(controlsContainer) controlsContainer.classList.remove('video-player__controls--hidden');
+    }
+    
+    const backButton = document.getElementById('video-back-helper');
+    if (backButton) {
+        backButton.addEventListener('click', () => {
+            window.location.href = "{% url 'stream:tenant-portal' %}";
+        });
+    }
+
+    const fullscreenButton = document.getElementById('video-fullscreen-helper');
+    const iframeElement = document.querySelector(".player iframe");
+    if (fullscreenButton && iframeElement) {
+        fullscreenButton.addEventListener('click', () => {
+            const enterFullscreen = iframeElement.requestFullscreen || iframeElement.webkitRequestFullscreen || iframeElement.mozRequestFullScreen || iframeElement.msRequestFullscreen;
+            if (enterFullscreen) {
+                enterFullscreen.call(iframeElement).catch(err => console.error(err));
+            }
+        });
+    }
+
+    const playButton = document.getElementById('video-play-helper');
+    if (playButton) {
+        playButton.style.display = 'none';
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
