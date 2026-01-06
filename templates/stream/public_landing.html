@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Home | Netfliz{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h1>Assista catálogos criados por proprietários</h1>
+  <p class="subtitle">Selecione o tenant desejado e veja o catálogo público.</p>
+  <div class="tenant-grid">
+    {% for tenant in tenants %}
+    <article class="tenant-card">
+      <h2>{{ tenant.slug }}</h2>
+      <p>{{ tenant.user.get_full_name|default:tenant.user.username }}</p>
+      <a class="btn" href="{% url 'stream:tenant-home' tenant.slug %}">Ver catálogo</a>
+    </article>
+    {% empty %}
+    <p>Nenhum tenant publicado por enquanto. Crie um no painel do proprietário.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

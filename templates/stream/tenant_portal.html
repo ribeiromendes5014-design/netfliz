@@ -1,0 +1,1213 @@
+﻿{% extends "base.html" %}
+{% block title %}Início • Netfliz{% endblock %}
+
+{% block content %}
+<section class="catalog">
+  <div class="catalog-tabs" role="tablist" aria-label="Categorias">
+    <button class="catalog-tab catalog-tab--active" data-category="mininovela" role="tab" aria-selected="true">
+      Mininovela
+    </button>
+    <button class="catalog-tab" data-category="movies" role="tab" aria-selected="false">
+      Filmes
+    </button>
+    <button class="catalog-tab" data-category="series" role="tab" aria-selected="false">
+      Séries
+    </button>
+  </div>
+
+  <header class="catalog-header">
+    <div>
+      <h1>Assista filmes, séries e novelas em um só lugar</h1>
+    </div>
+  </header>
+
+  {% if tv_channels %}
+  <section class="category-panel category-panel--mininovela" data-category="mininovela">
+    <div class="tv-section">
+      <header class="tv-section__header">
+        <div>
+          <p class="catalog-tag">Mininovela</p>
+        </div>
+      </header>
+    </div>
+    {% if continue_tv %}
+    <div class="continue-section continue-section--category">
+      <div class="continue-section__header">
+        <div>
+          <p class="continue-section__eyebrow">Continue assistindo</p>
+          <h2>Mininovela</h2>
+        </div>
+      </div>
+      <div class="continue-grid">
+        {% for video in continue_tv %}
+        <article class="continue-card">
+          <form
+            method="post"
+            action="{% url 'stream:portal-reset' video.slug %}"
+            class="continue-card__actions"
+          >
+            {% csrf_token %}
+            <button type="submit" class="continue-card__reset" aria-label="Remover do Retomar">
+              ×
+            </button>
+          </form>
+          <a
+            class="continue-card__link"
+            href="{% url 'stream:tenant-watch' tenant.slug video.slug %}"
+          >
+            <div class="continue-card__image">
+              <img
+                src="{{ video.cover_url|default:'/static/img/default-cover.png' }}"
+                alt="Capa {{ video.title }}"
+                loading="lazy"
+              />
+              <span class="continue-card__badge">Continuar</span>
+            </div>
+            <div class="continue-card__meta">
+              <h3>{{ video.title }}</h3>
+              <p>Retomar em {{ video.resume_label }}</p>
+            </div>
+          </a>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="catalog-grid catalog-grid--tv">
+      {% for channel in tv_channels %}
+      <button
+        type="button"
+        class="tv-list__item catalog-card"
+        data-source="{{ channel.source_url }}"
+        data-slug="{{ channel.slug }}"
+        data-video-id="{{ channel.pk }}"
+        data-stream-endpoint="{% url 'stream:tv-channel-stream' channel.pk %}"
+        data-title="{{ channel.title }}"
+        data-cover="{{ channel.cover_url|default:'/static/img/default-cover.png' }}"
+        data-description="{{ channel.description|default:''|escape }}"
+        data-format="TV"
+        data-watch-url="{% url 'stream:tenant-watch' tenant.slug channel.slug %}"
+        data-progress="{{ channel.resume_position|default:0 }}"
+        data-sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
+      >
+        <span class="catalog-card__badge">TV</span>
+        <div class="catalog-card__image">
+          <img
+            src="{{ channel.cover_url|default:'/static/img/default-cover.png' }}"
+            alt="Capa {{ channel.title }}"
+            loading="lazy"
+          />
+        </div>
+        <div class="catalog-card__meta">
+          <h3>{{ channel.title }}</h3>
+          {% if channel.description %}
+          <p>{{ channel.description|truncatechars:80 }}</p>
+          {% endif %}
+        </div>
+      </button>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="category-panel category-panel--series" data-category="series">
+    <div class="series-section">
+      <header class="series-section__header">
+        <div>
+          <p class="catalog-tag">Coleção</p>
+          <h2>Séries</h2>
+        </div>
+        <span class="series-section__indicator">{{ series_list|length }} títulos</span>
+      </header>
+      {% if continue_series %}
+      <div class="continue-section continue-section--category">
+        <div class="continue-section__header">
+          <div>
+            <p class="continue-section__eyebrow">Continue assistindo</p>
+            <h2>Séries</h2>
+          </div>
+        </div>
+        <div class="continue-grid">
+          {% for video in continue_series %}
+          <article class="continue-card">
+            <form
+              method="post"
+              action="{% url 'stream:portal-reset' video.slug %}"
+              class="continue-card__actions"
+            >
+              {% csrf_token %}
+              <button type="submit" class="continue-card__reset" aria-label="Remover do Retomar">
+                ×
+              </button>
+            </form>
+            <a
+              class="continue-card__link"
+              href="{% url 'stream:tenant-watch' tenant.slug video.slug %}"
+            >
+              <div class="continue-card__image">
+                <img
+                  src="{{ video.cover_url|default:'/static/img/default-cover.png' }}"
+                  alt="Capa {{ video.title }}"
+                  loading="lazy"
+                />
+                <span class="continue-card__badge">Continuar</span>
+              </div>
+              <div class="continue-card__meta">
+                <h3>{{ video.title }}</h3>
+                <p>Retomar em {{ video.resume_label }}</p>
+              </div>
+            </a>
+          </article>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if series_list %}
+      <div class="series-grid">
+        {% for series in series_list %}
+        <button
+          type="button"
+          class="series-card"
+          data-series-index="{{ forloop.counter0 }}"
+        >
+          <span class="series-card__badge">{{ series.episode_count }} episódios</span>
+          <div class="series-card__image">
+            <img
+              src="{{ series.cover_url|default:'/static/img/default-cover.png' }}"
+              alt="Capa {{ series.title }}"
+              loading="lazy"
+            />
+          </div>
+          <div class="series-card__meta">
+            <h3>{{ series.title }}</h3>
+            <p>{{ series.description|default:"Sem descrição disponível."|truncatechars:80 }}</p>
+          </div>
+        </button>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="catalog-empty">Nenhuma série cadastrada.</p>
+      {% endif %}
+  </section>
+  <section class="category-panel category-panel--movies" data-category="movies">
+    {% if continue_movies %}
+    <div class="continue-section continue-section--category">
+      <div class="continue-section__header">
+        <div>
+          <p class="continue-section__eyebrow">Continue assistindo</p>
+          <h2>Filmes</h2>
+        </div>
+      </div>
+      <div class="continue-grid">
+        {% for video in continue_movies %}
+        <article class="continue-card">
+          <form
+            method="post"
+            action="{% url 'stream:portal-reset' video.slug %}"
+            class="continue-card__actions"
+          >
+            {% csrf_token %}
+            <button type="submit" class="continue-card__reset" aria-label="Remover do Retomar">
+              ×
+            </button>
+          </form>
+          <a
+            class="continue-card__link"
+            href="{% url 'stream:tenant-watch' tenant.slug video.slug %}"
+          >
+            <div class="continue-card__image">
+              <img
+                src="{{ video.cover_url|default:'/static/img/default-cover.png' }}"
+                alt="Capa {{ video.title }}"
+                loading="lazy"
+              />
+              <span class="continue-card__badge">Continuar</span>
+            </div>
+            <div class="continue-card__meta">
+              <h3>{{ video.title }}</h3>
+              <p>Retomar em {{ video.resume_label }}</p>
+            </div>
+          </a>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% if videos %}
+    <div class="catalog-grid">
+      {% for video in videos %}
+        <button
+          type="button"
+          class="catalog-card"
+          data-title="{{ video.title }}"
+          data-description="{{ video.description|default:'Sem descrição disponível.' }}"
+          data-format="{{ video.get_video_type_display }}"
+          data-cover="{{ video.cover_url|default:'' }}"
+          data-watch-url="{% url 'stream:tenant-watch' tenant.slug video.slug %}"
+          data-progress="{{ video.resume_position|default:0 }}"
+        >
+        <span class="catalog-card__badge">{{ video.get_video_type_display }}</span>
+        <div class="catalog-card__image">
+          <img src="{{ video.cover_url|default:'/static/img/default-cover.png' }}" loading="lazy" alt="Capa {{ video.title }}" />
+        </div>
+        <div class="catalog-card__meta">
+          <h3>{{ video.title }}</h3>
+          <p>{{ video.description|truncatechars:80 }}</p>
+        </div>
+      </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="catalog-empty">
+      <p>Seu catálogo ainda está vazio. Peça ao proprietário para cadastrar vídeos.</p>
+    </div>
+    {% endif %}
+  </section>
+</section>
+<script>
+  window.SERIES_PAYLOAD = {{ series_payload|default:"[]"|safe }};
+</script>
+
+<div class="catalog-modal" id="video-modal">
+  <div class="catalog-modal__dialog">
+    <button type="button" class="catalog-modal__close" aria-label="Fechar">✕</button>
+    <div class="catalog-modal__hero">
+      <img src="" alt="" id="catalog-modal-cover" loading="lazy" />
+    </div>
+    <div class="catalog-modal__body">
+      <div class="catalog-modal__heading">
+        <h2 id="catalog-modal-title"></h2>
+        <span id="catalog-modal-format"></span>
+      </div>
+      <p id="catalog-modal-description"></p>
+      <div class="catalog-modal__series" id="catalog-modal-series">
+        <div class="catalog-modal__series-header">
+          <strong id="catalog-modal-series-title">Episódios</strong>
+          <span id="catalog-modal-episodes-count"></span>
+        </div>
+        <div class="catalog-modal__episodes" id="catalog-modal-episodes"></div>
+      </div>
+      <div class="catalog-modal__controls">
+        <a id="catalog-modal-watch" class="btn btn-accent" href="#">
+          Assistir agora
+        </a>
+        <button type="button" class="btn btn-secondary modal-close">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tv-overlay" id="tv-overlay" tabindex="-1">
+  <div class="tv-overlay__backdrop"></div>
+  <div class="tv-overlay__content">
+    <header class="tv-overlay__header">
+      <h2 id="tv-overlay-title"></h2>
+      <button type="button" class="tv-overlay__close" aria-label="Fechar canal">×</button>
+    </header>
+    <div class="tv-player-wrapper">
+      <iframe
+        id="tv-overlay-iframe"
+        allow="autoplay; fullscreen; encrypted-media"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
+        frameborder="0"
+        loading="lazy"
+        title="Player do canal"
+        aria-label="Player do canal embedado"
+      ></iframe>
+      <div id="tv-overlay-player" class="tv-overlay__clappr" aria-label="Player interno"></div>
+    </div>
+  <div class="tv-overlay__controls" aria-label="Controles do canal">
+    <button type="button" id="tv-overlay-play-helper" class="tv-overlay__control btn">
+      ▶ Reproduzir
+    </button>
+    <button type="button" id="tv-overlay-channel-helper" class="tv-overlay__control btn btn-secondary">
+      ƒ-ô Canais
+    </button>
+    <button type="button" id="tv-overlay-fullscreen-helper" class="tv-overlay__control btn btn-secondary">
+      Tela cheia
+    </button>
+    <button type="button" id="tv-overlay-close-helper" class="tv-overlay__control btn btn-secondary">
+      × Voltar
+    </button>
+  </div>
+  </div>
+</div>
+
+<div class="tv-channel-modal" id="tv-channel-modal">
+  <div class="tv-channel-modal__backdrop"></div>
+  <div class="tv-channel-modal__content">
+    <header class="tv-channel-modal__header">
+      <h3>Escolher canal</h3>
+      <button type="button" class="tv-channel-modal__close" aria-label="Fechar lista">×</button>
+    </header>
+    <div class="tv-channel-modal__list" role="menu"></div>
+  </div>
+</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const modal = document.getElementById("video-modal");
+      const coverEl = document.getElementById("catalog-modal-cover");
+      const titleEl = document.getElementById("catalog-modal-title");
+      const descriptionEl = document.getElementById("catalog-modal-description");
+      const formatEl = document.getElementById("catalog-modal-format");
+      const watchLink = document.getElementById("catalog-modal-watch");
+      const seriesSection = document.getElementById("catalog-modal-series");
+      const episodesContainer = document.getElementById("catalog-modal-episodes");
+      const episodesCountEl = document.getElementById("catalog-modal-episodes-count");
+      const tvOverlay = document.getElementById("tv-overlay");
+      const tvOverlayIframe = document.getElementById("tv-overlay-iframe");
+      const tvOverlayTitle = document.getElementById("tv-overlay-title");
+      const tvOverlayClose = document.querySelector(".tv-overlay__close");
+      const tvOverlayPlayHelper = document.getElementById("tv-overlay-play-helper");
+      const tvOverlayChannelHelper = document.getElementById("tv-overlay-channel-helper");
+      const tvOverlayFullscreenHelper = document.getElementById("tv-overlay-fullscreen-helper");
+      const tvOverlayCloseHelper = document.getElementById("tv-overlay-close-helper");
+      const PLAY_LABEL = "▶ Reproduzir";
+      const PAUSE_LABEL = "▌▌ Pausar";
+      let isTvPlaying = false;
+      const setPlayButtonState = (playing) => {
+        if (tvOverlayPlayHelper) {
+          tvOverlayPlayHelper.textContent = playing ? PAUSE_LABEL : PLAY_LABEL;
+        }
+        isTvPlaying = playing;
+      };
+      setPlayButtonState(false);
+      if (!modal || !coverEl || !titleEl || !descriptionEl || !formatEl || !watchLink) {
+        return;
+      }
+      const closeButtons = modal.querySelectorAll(".catalog-modal__close, .modal-close");
+      const fallbackCover =
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 225'%3E%3Crect width='400' height='225' fill='%230a0a0f'/%3E%3Ctext x='50%25' y='50%25' fill='%23f5f5f1' font-size='26' font-family='Segoe UI' text-anchor='middle' dominant-baseline='middle'%3ENetfliz%3C/text%3E%3C/svg%3E";
+      const fallbackDescription = "Sem descrição disponível.";
+      const seriesPayload = Array.isArray(window.SERIES_PAYLOAD) ? window.SERIES_PAYLOAD : [];
+      const categoryTabs = Array.from(document.querySelectorAll(".catalog-tab"));
+      const categoryPanels = Array.from(document.querySelectorAll(".category-panel"));
+      const categorySequence = categoryPanels
+        .map((panel) => panel.dataset.category)
+        .filter(Boolean);
+      const tvCards = Array.from(document.querySelectorAll(".tv-list__item"));
+      const seriesCards = Array.from(document.querySelectorAll(".series-card"));
+      const videoCards = Array.from(document.querySelectorAll(".catalog-card:not(.tv-list__item)"));
+      let focusGridIndex = 0;
+      let skipRemotePlayAction = false;
+      const isCategoryTab = (element) => categoryTabs.includes(element);
+      const getActiveCategoryTabElement = () => {
+        const activeCategory = document.querySelector(".category-panel.is-active")?.dataset.category;
+        let tab = categoryTabs.find((tab) => {
+          if (tab.hasAttribute("disabled")) {
+            return false;
+          }
+          return tab.dataset.category === activeCategory;
+        });
+        if (!tab) {
+          tab = categoryTabs.find((tab) => !tab.hasAttribute("disabled"));
+        }
+        return tab;
+      };
+      const focusActiveCategoryTab = () => {
+        const tab = getActiveCategoryTabElement();
+        tab?.focus();
+      };
+      let lastFocusedElementBeforeTvOverlay = null;
+
+      const getVisibleFocusable = () => {
+        const panel = document.querySelector(".category-panel.is-active");
+        if (!panel) {
+          return [];
+        }
+        return Array.from(
+          panel.querySelectorAll(".tv-list__item, .series-card, .catalog-card")
+        );
+      };
+
+      const focusGridCard = (index) => {
+        const cards = getVisibleFocusable();
+        if (!cards.length) {
+          return;
+        }
+        focusGridIndex = ((index % cards.length) + cards.length) % cards.length;
+        cards[focusGridIndex].focus();
+      };
+
+      const setActiveCategory = (category) => {
+        let target = categoryPanels.find((panel) => panel.dataset.category === category);
+        if (!target) {
+          target = categoryPanels[0];
+        }
+        categoryPanels.forEach((panel) => {
+          panel.classList.toggle("is-active", panel === target);
+        });
+        categoryTabs.forEach((tab) => {
+          const isActive = tab.dataset.category === (target?.dataset.category || "");
+          tab.classList.toggle("catalog-tab--active", isActive);
+          tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+        focusGridCard(0);
+      };
+
+      const cycleCategory = (delta) => {
+        if (!categorySequence.length) {
+          return;
+        }
+        const activeCategory = document.querySelector(".category-panel.is-active")?.dataset.category;
+        const currentIndex = categorySequence.indexOf(activeCategory);
+        const normalized = ((currentIndex + delta) % categorySequence.length + categorySequence.length) % categorySequence.length;
+        setActiveCategory(categorySequence[normalized]);
+      };
+
+      const defaultCategory = tvCards.length ? "mininovela" : categoryPanels[0]?.dataset.category || "movies";
+      const tvTab = categoryTabs.find((tab) => tab.dataset.category === "mininovela");
+      if (!tvCards.length) {
+        tvTab?.setAttribute("disabled", "disabled");
+        tvTab?.setAttribute("aria-disabled", "true");
+      }
+      const handleTabKeydown = (event) => {
+        const activeIndex = categoryTabs.indexOf(document.activeElement);
+        if (activeIndex < 0) {
+          return;
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          let next = (activeIndex + 1) % categoryTabs.length;
+          while (categoryTabs[next].hasAttribute("disabled")) {
+            next = (next + 1) % categoryTabs.length;
+          }
+          categoryTabs[next].focus();
+          return;
+        }
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          let prev = (activeIndex - 1 + categoryTabs.length) % categoryTabs.length;
+          while (categoryTabs[prev].hasAttribute("disabled")) {
+            prev = (prev - 1 + categoryTabs.length) % categoryTabs.length;
+          }
+          categoryTabs[prev].focus();
+        }
+      };
+      const activateCategoryTab = (tab) => {
+        if (!tab || tab.hasAttribute("disabled")) {
+          return;
+        }
+        setActiveCategory(tab.dataset.category);
+      };
+
+      categoryTabs.forEach((tab) => {
+        tab.addEventListener("click", () => activateCategoryTab(tab));
+        tab.addEventListener("pointerdown", () => activateCategoryTab(tab));
+        tab.addEventListener("keydown", (event) => {
+          handleTabKeydown(event);
+          if (["Enter", " "].includes(event.key)) {
+            event.preventDefault();
+            skipRemotePlayAction = true;
+            activateCategoryTab(tab);
+          }
+        });
+      });
+      setActiveCategory(defaultCategory);
+      const modalState = {
+        type: "video",
+        episodes: [],
+        activeEpisodeIndex: 0,
+        controlButtons: [],
+        controlIndex: 0,
+        tvSource: "",
+        isTv: false,
+        format: "",
+        title: "",
+      };
+
+      const formatTime = (seconds) => {
+        const secs = Math.floor(seconds || 0);
+        const minutes = Math.floor(secs / 60);
+        const rem = (secs % 60).toString().padStart(2, "0");
+        return `${minutes}:${rem}`;
+      };
+
+      const updateWatchButtonLabel = (progress) => {
+        const value = Number(progress) || 0;
+        if (value > 5) {
+          watchLink.textContent = `Continuar (${formatTime(value)})`;
+        } else {
+          watchLink.textContent = "Assistir agora";
+        }
+      };
+
+      const updateModalControls = () => {
+        modalState.controlButtons = Array.from(
+          modal.querySelectorAll(".catalog-modal__controls button, .catalog-modal__controls a")
+        );
+      };
+
+      const focusModalControl = (index) => {
+        const controls = modalState.controlButtons || [];
+        if (!controls.length) {
+          return;
+        }
+        modalState.controlIndex = ((index % controls.length) + controls.length) % controls.length;
+        controls[modalState.controlIndex].focus();
+      };
+
+      const setActiveEpisode = (index) => {
+        const buttons = Array.from(episodesContainer.querySelectorAll(".catalog-modal__episode"));
+        if (!buttons.length) {
+          return;
+        }
+        const normalized = ((index % buttons.length) + buttons.length) % buttons.length;
+        modalState.activeEpisodeIndex = normalized;
+        buttons.forEach((button, idx) => button.classList.toggle("is-active", idx === normalized));
+        const episode = modalState.episodes[normalized];
+        if (!episode) {
+          return;
+        }
+        watchLink.href = episode.watch_url;
+        if (episode.resume_label) {
+          watchLink.textContent = `Continuar ${episode.episode_label} (${episode.resume_label})`;
+        } else {
+          watchLink.textContent = `Assistir ${episode.episode_label}`;
+        }
+      };
+
+      const focusEpisodeButton = (index) => {
+        const buttons = Array.from(episodesContainer.querySelectorAll(".catalog-modal__episode"));
+        if (!buttons.length) {
+          return;
+        }
+        const normalized = ((index % buttons.length) + buttons.length) % buttons.length;
+        buttons[normalized].focus();
+        setActiveEpisode(normalized);
+      };
+
+      const renderEpisodes = (episodes) => {
+        episodesContainer.innerHTML = "";
+        modalState.episodes = episodes || [];
+        modalState.activeEpisodeIndex = 0;
+        episodes.forEach((episode, idx) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "catalog-modal__episode";
+          button.dataset.index = idx;
+          button.dataset.watchUrl = episode.watch_url;
+          const label = document.createElement("span");
+          label.className = "catalog-modal__episode-label";
+          label.textContent = episode.episode_label;
+          const title = document.createElement("strong");
+          title.textContent = episode.title;
+          button.appendChild(label);
+          button.appendChild(title);
+          if (episode.resume_label) {
+            const resume = document.createElement("span");
+            resume.className = "catalog-modal__episode-progress";
+            resume.textContent = `Continuar (${episode.resume_label})`;
+            button.appendChild(resume);
+          }
+          button.addEventListener("click", () => {
+            focusEpisodeButton(idx);
+            watchLink.focus();
+          });
+          episodesContainer.appendChild(button);
+        });
+        if (modalState.episodes.length) {
+          focusEpisodeButton(0);
+        }
+      };
+
+      const buildAutoplaySource = (url) => {
+        if (!url) {
+          return "";
+        }
+        const separator = url.includes("?") ? "&" : "?";
+        return `${url}${separator}autoplay=1&muted=1&playsinline=1`;
+      };
+
+      const channelModal = document.getElementById("tv-channel-modal");
+      const channelModalList = channelModal?.querySelector(".tv-channel-modal__list");
+      const channelModalClose = channelModal?.querySelector(".tv-channel-modal__close");
+      const clapprContainer = document.getElementById("tv-overlay-player");
+      let clapprPlayer = null;
+
+      const isDirectStream = (url) => /\.(mp4|m3u8)(\?.*)?$/i.test(url || "");
+
+      const destroyClappr = () => {
+        if (clapprPlayer) {
+          clapprPlayer.destroy();
+          clapprPlayer = null;
+        }
+        if (clapprContainer) {
+          clapprContainer.innerHTML = "";
+        }
+      };
+
+      const showClappr = (source) => {
+        if (!clapprContainer || !window.Clappr) {
+          return false;
+        }
+        destroyClappr();
+        clapprContainer.style.display = "block";
+        if (tvOverlayIframe) {
+          tvOverlayIframe.style.display = "none";
+        }
+        clapprPlayer = new Clappr.Player({
+          source,
+          parentId: "#tv-overlay-player",
+          autoPlay: true,
+          mute: true,
+          width: "100%",
+          height: "100%",
+          mediacontrol: { seekbar: true },
+        });
+        setPlayButtonState(true);
+        clapprPlayer.on(Clappr.Events.PLAYER_PLAY, () => setPlayButtonState(true));
+        clapprPlayer.on(Clappr.Events.PLAYER_PAUSE, () => setPlayButtonState(false));
+        return true;
+      };
+
+      const hideClappr = () => {
+        if (clapprContainer) {
+          clapprContainer.style.display = "none";
+        }
+        destroyClappr();
+        setPlayButtonState(false);
+        if (tvOverlayIframe) {
+          tvOverlayIframe.style.display = "block";
+        }
+      };
+
+      channelModal?.addEventListener("click", (event) => {
+        if (event.target === channelModal || event.target.classList.contains("tv-channel-modal__backdrop")) {
+          closeChannelModal();
+        }
+      });
+
+      const isOverlayActive = () =>
+        modal.classList.contains("open") ||
+        tvOverlay?.classList.contains("is-visible") ||
+        channelModal?.classList.contains("is-visible");
+
+      const remotePlayKeys = new Set(["MediaPlayPause", "Play", "MediaPlay", "PlayPause", "AudioPlay", "Enter"]);
+      const remotePlayKeyCodes = new Set([13, 32, 179, 177, 178, 415, 205]); // Enter, Space, Media keys
+      const arrowKeyNames = new Set([
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "Up",
+        "Down",
+        "Left",
+        "Right",
+        "ChannelUp",
+        "ChannelDown",
+        "ChannelLeft",
+        "ChannelRight",
+        "PageUp",
+        "PageDown",
+      ]);
+      const arrowKeyCodes = new Set([37, 38, 39, 40, 19, 20, 21, 22, 33, 34]);
+      const backKeyNames = new Set(["Backspace", "BrowserBack", "SoftBack", "Back", "Escape"]);
+      const backKeyCodes = new Set([8, 166, 4, 27, 10009]);
+      const getChannelDirection = (event) => {
+        if (
+          ["ChannelUp", "PageUp", "ChannelLeft"].includes(event.key) ||
+          [21, 33].includes(event.keyCode)
+        ) {
+          return -1;
+        }
+        if (
+          ["ChannelDown", "PageDown", "ChannelRight"].includes(event.key) ||
+          [22, 34].includes(event.keyCode)
+        ) {
+          return 1;
+        }
+        return 0;
+      };
+
+      const triggerRemotePlayAction = (element) => {
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+        const continueLink = element.closest(".continue-card__link");
+        if (continueLink) {
+          continueLink.click();
+          return true;
+        }
+        const tvCard = element.closest(".tv-list__item");
+        if (tvCard) {
+          return openTvModalFromCard(tvCard);
+        }
+        const catalogCard = element.closest(".catalog-card");
+        if (catalogCard) {
+          catalogCard.click();
+          return true;
+        }
+        const seriesCard = element.closest(".series-card");
+        if (seriesCard) {
+          seriesCard.click();
+          return true;
+        }
+        return false;
+      };
+
+      const handleRemotePlayKey = (event) => {
+        if (!remotePlayKeys.has(event.key) && !remotePlayKeyCodes.has(event.keyCode)) {
+          return;
+        }
+        if (skipRemotePlayAction) {
+          skipRemotePlayAction = false;
+          return;
+        }
+        if (isOverlayActive()) {
+          event.preventDefault();
+          tvOverlayIframe?.focus();
+          return;
+        }
+        if (triggerRemotePlayAction(document.activeElement)) {
+          event.preventDefault();
+        }
+      };
+
+      document.addEventListener("keydown", handleRemotePlayKey);
+
+      const isArrowKey = (event) => arrowKeyNames.has(event.key) || arrowKeyCodes.has(event.keyCode);
+      const isBackKey = (event) => backKeyNames.has(event.key) || backKeyCodes.has(event.keyCode);
+      const getArrowDelta = (event) => {
+        if (["ArrowRight", "Right"].includes(event.key) || event.keyCode === 39 || event.keyCode === 40) {
+          return 1;
+        }
+        if (["ArrowLeft", "Left"].includes(event.key) || event.keyCode === 37 || event.keyCode === 38) {
+          return -1;
+        }
+        return 0;
+      };
+
+      const handleNavigationKey = (event) => {
+        if (modal.classList.contains("open")) {
+          return;
+        }
+        if (isOverlayActive()) {
+          if (isBackKey(event)) {
+            event.preventDefault();
+            closeTvOverlay();
+          }
+          return;
+        }
+        if (isCategoryTab(document.activeElement) && arrowKeyNames.has(event.key)) {
+          // let the built-in tab handler take over (it listens on the tab buttons)
+          return;
+        }
+        if (isBackKey(event)) {
+          event.preventDefault();
+          focusActiveCategoryTab();
+          return;
+        }
+        const channelDelta = getChannelDirection(event);
+        if (channelDelta !== 0) {
+          event.preventDefault();
+          cycleCategory(channelDelta);
+          return;
+        }
+        if (!isArrowKey(event)) {
+          return;
+        }
+        event.preventDefault();
+        if (["ArrowUp", "Up"].includes(event.key) && !isCategoryTab(document.activeElement)) {
+          focusActiveCategoryTab();
+          return;
+        }
+        if (["ArrowDown", "Down"].includes(event.key) && isCategoryTab(document.activeElement)) {
+          focusGridCard(0);
+          return;
+        }
+        const delta = getArrowDelta(event);
+        focusGridCard(focusGridIndex + delta);
+      };
+
+      document.addEventListener("keydown", handleNavigationKey);
+      const fetchChannelStream = async (card) => {
+        const endpoint = card?.dataset.streamEndpoint;
+        if (!endpoint) {
+          return card?.dataset.source || "";
+        }
+        try {
+          const response = await fetch(endpoint, {
+            headers: { Accept: "application/json" },
+          });
+          if (!response.ok) {
+            throw new Error(`Token ${response.status}`);
+          }
+          const payload = await response.json();
+          return payload.url || card.dataset.source;
+        } catch (error) {
+          console.error("Não foi possível obter o stream autorizado:", error);
+          return card.dataset.source;
+        }
+      };
+
+      const openChannelFromCard = (card) => {
+        if (!card) {
+          return;
+        }
+        const sandboxAttr = card.dataset.sandbox;
+        if (sandboxAttr && tvOverlayIframe) {
+          tvOverlayIframe.setAttribute("sandbox", sandboxAttr);
+        }
+        card.setAttribute("aria-busy", "true");
+        const safeTitle = card.dataset.title || card.textContent.trim();
+        fetchChannelStream(card)
+          .then((source) => openTvOverlay(source, safeTitle))
+          .finally(() => card.removeAttribute("aria-busy"));
+      };
+
+      const populateChannelModal = () => {
+        if (!channelModalList) {
+          return;
+        }
+        channelModalList.innerHTML = "";
+        tvCards.forEach((channel) => {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "tv-channel-modal__item";
+          item.textContent = channel.dataset.title || "Canal";
+          item.dataset.source = channel.dataset.source;
+          item.dataset.title = channel.dataset.title;
+          item.addEventListener("click", () => {
+            const source = item.dataset.source;
+            const title = item.dataset.title;
+            openTvOverlay(source, title);
+            closeChannelModal();
+          });
+          channelModalList.appendChild(item);
+        });
+      };
+
+      const closeChannelModal = () => {
+        if (!channelModal) {
+          return;
+        }
+        channelModal.classList.remove("is-visible");
+        tvOverlay?.focus();
+      };
+
+      const openChannelModal = () => {
+        if (!channelModal) {
+          return;
+        }
+        populateChannelModal();
+        channelModal.classList.add("is-visible");
+        const first = channelModalList?.querySelector(".tv-channel-modal__item");
+        first?.focus();
+      };
+      const focusChannelItem = (delta) => {
+        if (!channelModalList) {
+          return;
+        }
+        const items = Array.from(channelModalList.querySelectorAll(".tv-channel-modal__item"));
+        if (!items.length) {
+          return;
+        }
+        const currentIndex = items.indexOf(document.activeElement);
+        let nextIndex = 0;
+        if (currentIndex >= 0) {
+          nextIndex = currentIndex + delta;
+        }
+        nextIndex = ((nextIndex % items.length) + items.length) % items.length;
+        items[nextIndex].focus();
+      };
+
+      const handleChannelModalKeydown = (event) => {
+        if (!channelModal?.classList.contains("is-visible")) {
+          return;
+        }
+        if (["ArrowDown", "ArrowRight"].includes(event.key)) {
+          event.preventDefault();
+          focusChannelItem(1);
+          return;
+        }
+        if (["ArrowUp", "ArrowLeft"].includes(event.key)) {
+          event.preventDefault();
+          focusChannelItem(-1);
+          return;
+        }
+        if (event.key === "Escape" || event.key === "Backspace") {
+          event.preventDefault();
+          closeChannelModal();
+        }
+      };
+
+      channelModal?.addEventListener("keydown", handleChannelModalKeydown);
+      channelModalClose?.addEventListener("click", closeChannelModal);
+
+      const tvOverlayContent = tvOverlay?.querySelector(".tv-overlay__content");
+      const enterTvFullscreen = () => {
+        if (!tvOverlayContent) {
+          return;
+        }
+        if (document.fullscreenElement !== tvOverlayContent && tvOverlayContent.requestFullscreen) {
+          tvOverlayContent.requestFullscreen().catch(() => {});
+        }
+      };
+      const exitTvFullscreen = () => {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      };
+
+      const toggleTvFullscreen = () => {
+        if (document.fullscreenElement === tvOverlayContent) {
+          exitTvFullscreen();
+        } else {
+          enterTvFullscreen();
+        }
+      };
+
+      const toggleTvPlayState = () => {
+        if (clapprPlayer) {
+          if (isTvPlaying) {
+            clapprPlayer.pause();
+          } else {
+            clapprPlayer.play();
+          }
+          return;
+        }
+        if (tvOverlayIframe && tvOverlayIframe.dataset.src) {
+          if (isTvPlaying) {
+            tvOverlayIframe.src = "about:blank";
+            setPlayButtonState(false);
+          } else {
+            tvOverlayIframe.src = tvOverlayIframe.dataset.src;
+            setPlayButtonState(true);
+          }
+        }
+      };
+
+      const openTvOverlay = (source, title) => {
+        if (!tvOverlay || !tvOverlayIframe) {
+          return;
+        }
+        lastFocusedElementBeforeTvOverlay = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        tvOverlayTitle && (tvOverlayTitle.textContent = title || "Canal ao vivo");
+        if (isDirectStream(source)) {
+          tvOverlayIframe.style.display = "none";
+          if (tvOverlayIframe.dataset.src) delete tvOverlayIframe.dataset.src;
+          showClappr(source);
+        } else {
+          hideClappr();
+          tvOverlayIframe.style.display = "block";
+          const url = buildAutoplaySource(source);
+          tvOverlayIframe.src = url;
+          tvOverlayIframe.dataset.src = url;
+          setPlayButtonState(true);
+        }
+        tvOverlay.classList.add("is-visible");
+        tvOverlay?.focus();
+        enterTvFullscreen();
+      };
+
+      watchLink.addEventListener("click", (event) => {
+        if (modalState.isTv && modalState.tvSource) {
+          event.preventDefault();
+          closeModal();
+          openTvOverlay(modalState.tvSource, modalState.title);
+        }
+      });
+
+      const closeTvOverlay = () => {
+        if (!tvOverlay) {
+          return;
+        }
+        tvOverlay.classList.remove("is-visible");
+        hideClappr();
+        exitTvFullscreen();
+        tvOverlayIframe.src = "about:blank";
+        if (tvOverlayIframe.dataset.src) {
+          delete tvOverlayIframe.dataset.src;
+        }
+        if (lastFocusedElementBeforeTvOverlay) {
+          lastFocusedElementBeforeTvOverlay.focus();
+        } else {
+          tvCards[0]?.focus();
+        }
+        lastFocusedElementBeforeTvOverlay = null;
+      };
+
+      const openVideoModal = (data) => {
+        coverEl.src = data.cover || fallbackCover;
+        coverEl.alt = data.title;
+        titleEl.textContent = data.title;
+        descriptionEl.textContent = data.description || fallbackDescription;
+        formatEl.textContent = data.format;
+        watchLink.href = data.watchUrl || "#";
+        modalState.tvSource = data.source || "";
+        modalState.isTv = Boolean(data.isTv);
+        modalState.format = data.format || "";
+        modalState.title = data.title || "";
+        updateWatchButtonLabel(data.progress);
+        modalState.type = "video";
+        modalState.episodes = [];
+        episodesContainer.innerHTML = "";
+        seriesSection?.classList.remove("is-visible");
+        modal.classList.add("open");
+        updateModalControls();
+        focusModalControl(0);
+      };
+
+      function openTvModalFromCard(card) {
+        if (!card) {
+          return false;
+        }
+        openVideoModal({
+          title: card.dataset.title,
+          description: card.dataset.description,
+          format: card.dataset.format || "TV",
+          cover: card.dataset.cover,
+          watchUrl: card.dataset.watchUrl,
+          progress: card.dataset.progress,
+          source: card.dataset.source,
+          isTv: true,
+        });
+        return true;
+      }
+
+      const openSeriesModal = (seriesIndex) => {
+        const payload = seriesPayload[seriesIndex];
+        if (!payload) {
+          return;
+        }
+        coverEl.src = payload.cover_url || fallbackCover;
+        coverEl.alt = payload.title;
+        titleEl.textContent = payload.title;
+        descriptionEl.textContent = payload.description || fallbackDescription;
+        const seasons = Array.isArray(payload.seasons) ? payload.seasons : [];
+        formatEl.textContent = `${payload.episode_count} episódios`;
+        episodesCountEl.textContent = seasons.length
+          ? `${seasons.length} ${seasons.length > 1 ? "temporadas" : "temporada"}`
+          : `${payload.episode_count} episódios`;
+        seriesSection?.classList.add("is-visible");
+        modalState.type = "series";
+        renderEpisodes(payload.episodes || []);
+        modal.classList.add("open");
+        updateModalControls();
+        focusEpisodeButton(0);
+      };
+
+      const closeModal = () => {
+        modal.classList.remove("open");
+        seriesSection?.classList.remove("is-visible");
+        modalState.type = "video";
+        modalState.episodes = [];
+        modalState.activeEpisodeIndex = 0;
+        modalState.tvSource = "";
+        modalState.isTv = false;
+        modalState.format = "";
+        modalState.title = "";
+        watchLink.href = "#";
+      };
+
+      videoCards.forEach((card) => {
+        card.addEventListener("click", () => {
+          openVideoModal({
+            title: card.dataset.title,
+            description: card.dataset.description,
+            format: card.dataset.format,
+            cover: card.dataset.cover,
+            watchUrl: card.dataset.watchUrl,
+            progress: card.dataset.progress,
+          });
+        });
+      });
+
+      seriesCards.forEach((card) => {
+        card.addEventListener("click", () => openSeriesModal(Number(card.dataset.seriesIndex)));
+      });
+      tvCards.forEach((card) => {
+        card.addEventListener("click", () => openChannelFromCard(card));
+      });
+
+      const tvOverlayControls = Array.from(tvOverlay.querySelectorAll('.tv-overlay__control'));
+      let tvOverlayControlIndex = 0;
+      const focusTvOverlayControl = (index) => {
+          if (!tvOverlayControls.length) return;
+          const newIndex = (index + tvOverlayControls.length) % tvOverlayControls.length;
+          tvOverlayControlIndex = newIndex;
+          tvOverlayControls[newIndex]?.focus();
+      };
+
+      const handleTvOverlayKeydown = (event) => {
+        if (channelModal?.classList.contains("is-visible")) {
+          return;
+        }
+        if (remotePlayKeys.has(event.key) || remotePlayKeyCodes.has(event.keyCode)) {
+          event.preventDefault();
+          tvOverlayPlayHelper?.click();
+          return;
+        }
+        if (isBackKey(event) || event.key === "Escape") {
+          event.preventDefault();
+          closeTvOverlay();
+          return;
+        }
+
+        if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+            event.preventDefault();
+            const delta = (event.key === "ArrowRight" || event.key === "ArrowDown") ? 1 : -1;
+            
+            const currentFocusedIndex = tvOverlayControls.indexOf(document.activeElement);
+            
+            if(currentFocusedIndex === -1) {
+                focusTvOverlayControl(0);
+            } else {
+                focusTvOverlayControl(currentFocusedIndex + delta);
+            }
+        }
+      };
+      tvOverlay?.addEventListener("click", (event) => {
+        if (event.target === tvOverlay || event.target.classList.contains("tv-overlay__backdrop")) {
+          closeTvOverlay();
+        }
+      });
+      tvOverlayClose?.addEventListener("click", closeTvOverlay);
+      tvOverlayPlayHelper?.addEventListener("click", () => {
+        toggleTvPlayState();
+        tvOverlayIframe?.focus();
+      });
+      tvOverlayChannelHelper?.addEventListener("click", () => {
+        openChannelModal();
+      });
+      tvOverlayFullscreenHelper?.addEventListener("click", toggleTvFullscreen);
+      tvOverlayCloseHelper?.addEventListener("click", closeTvOverlay);
+      tvOverlay?.addEventListener("keydown", handleTvOverlayKeydown);
+
+      closeButtons?.forEach((btn) => btn.addEventListener("click", closeModal));
+
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+
+      modal.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) && !isBackKey(event)) {
+          return;
+        }
+        if (isBackKey(event)) {
+          event.preventDefault();
+          closeModal();
+          return;
+        }
+        if (modalState.type === "series" && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+          event.preventDefault();
+          const direction = event.key === "ArrowDown" ? 1 : -1;
+          focusEpisodeButton(modalState.activeEpisodeIndex + direction);
+          return;
+        }
+        if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
+          event.preventDefault();
+          focusModalControl(
+            modalState.controlIndex + (event.key === "ArrowRight" ? 1 : -1)
+          );
+        }
+      });
+
+    });
+  </script>
+  {% endblock %}
