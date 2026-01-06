@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Excluir série | Netfliz{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <header>
+    <h1>Excluir série</h1>
+    <p>Esta ação não pode ser desfeita. Tem certeza?</p>
+  </header>
+  <p class="catalog-empty">
+    A série "{{ object.title }}" será removida do catálogo, e todos os seus episódios.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <button class="btn btn-accent" type="submit">Confirmar exclusão</button>
+    <a class="btn btn-secondary" href="{% url 'stream:owner-dashboard' %}">Cancelar</a>
+  </form>
+</section>
+{% endblock %}
